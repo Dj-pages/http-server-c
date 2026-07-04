@@ -1,0 +1,11 @@
+server
+
+*.o
+
+*.gdb_history
+
+.nvimlog
+
+.DS_Store
+Thumbs.db
+

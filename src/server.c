@@ -35,10 +35,10 @@ void response(int cfd, int status_code, char *status_text, char *content_type, c
 }
 
 int main(void)
-{
+
   int sfd;
   struct sockaddr_in my_addr;
-  socklen_t my_addr_len;
+  //socklen_t my_addr_len;
 
   //create generic socket
   if((sfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)

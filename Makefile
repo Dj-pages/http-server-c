@@ -2,9 +2,9 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g
 
 server: src/server.c
-	$(cc) $(CFLAGS) -o server src/server.c
+	$(CC) $(CFLAGS) -o server src/server.c
 
-clean: 
+clean:
 	rm -f server
 
 .PHONY: clean

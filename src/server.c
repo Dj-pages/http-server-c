@@ -7,55 +7,10 @@
 #include <netinet/in.h>
 #include <stdio.h>
 #include <errno.h>
-
-void parse(char *request, char *method, char *path){
-  sscanf(request, "%s %s", method, path);
-}
-
-void response(int cfd, int status_code, char *status_text, char *content_type, FILE *file){
-  char header_buffer[1024] = {0};
-  fseek(file, 0, SEEK_END);
-  int file_size = ftell(file);
-  rewind(file);
-
-  int header_len = snprintf(
-  header_buffer, 
-  sizeof(header_buffer),
-    "HTTP/1.1 %d %s\r\n"
-    "Content-Type: %s\r\n"
-    "Content-Length: %d\r\n"
-    "Connection: close\r\n"
-    "\r\n",
-  status_code,
-  status_text,
-  content_type,
-  file_size
-
-                              );
-  write(cfd, response, header_len);
-  char file_buffer[4096] = {0};
-  int bytes_read;
-  while((bytes_read = fread(file_buffer, 1, sizeof(file_buffer), file)) > 0){
-    write(cfd, file_buffer, bytes_read);
-  }
-}
-
-void serve_error(int cfd, int status_code, char *status_txt, char *html_msg){
-  char response[1024];
-  int body_len = strlen(html_msg);
-  int response_len = snprintf(
-    response,
-    sizeof(response),
-    "HTTP/1.1 %d %s\r\n"
-    "Content-Type: text/html\r\n"
-    "Content-Lenght: %d\r\n"
-    "Connection: close\r\n"
-    "\r\n"
-    "%s",
-    status_code, status_txt, body_len, html_msg
-  );
-  write(cfd, response, response_len);
-}
+#include <stdbool.h>
+#include "response.h"
+#include "status_code.h"
+#include <fcntl.h>
 
 int main(void)
 {
@@ -109,30 +64,37 @@ int main(void)
     parse(buffer, method, path);
 
     //response 
+    //If the method is GET
     if(strcmp(method, "GET") == 0){
       char actual_path[512];
 
- if(strcmp(path, "/")){
-        strcpy(actual_path, "index.html");
+      if(strcmp(path, "/") == 0){
+        strcpy(actual_path, "src/index.html"); //path of the file
       }else{
-        strcpy(actual_path, path + 1);
+        snprintf(actual_path, sizeof(actual_path), "src/%s", path); // Path modification as per the requested path
       }
-      FILE *file = fopen(actual_path, "rb");
-      if(file == NULL){
-        printf("Page not found: %s\n", actual_path);
-        serve_error(cfd, 404, "Not Found", 
-                 "<html><body><h1>404 - Not Found</h1></body></html>");
-      }else{
-        char *content_type = "/text.plain";
-        if(strstr(actual_path, ".html")) content_type = "text/html";
-        else if(strstr(actual_path, ".css")) content_type = "text/css";
-        else if(strstr(actual_path, ".image/png")) content_type = "image/png";
-        response(cfd, 200, "OK", content_type, file);
-        printf("Log sucessfully served");
+      //check if the gives file is accessiable
+      if(access(actual_path, R_OK)){
+        serve_error(cfd, internal_server_error, "Something went wrong",
+                    "<html><body><h1>500 - Something went wrong Please try again</h1></body></html>");
+        close(cfd);
+        continue;
       }
+      int fileD; //file discriptor for the requested file
+      if((fileD = open(actual_path, O_RDONLY)) < 0){
+        serve_error(cfd, internal_server_error, "Something went wrong",
+                    "<html><body><h1>500 - Something went wrong Please try again</h1></body></html>");
+      }
+      //check the extension of the file
+      char *content_type;
+      if(strstr(actual_path, ".html")) content_type = "text/html";
+      else if(strstr(actual_path, ".css")) content_type = "text/css";
+      else if(strstr(actual_path, ".png")) content_type = "image/png";
+      response(cfd, ok, "ok", content_type, fileD);
 
     }else{
-      serve_error(cfd, 405, "Method Not Allowed",
+      //if method is not the get method then it is not allowd
+      serve_error(cfd, not_found, "Method Not Allowed",
                "<html><body><h1> Method Not allowed</h1</body></html>");
     }
     close(cfd);

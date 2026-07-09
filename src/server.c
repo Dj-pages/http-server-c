@@ -12,25 +12,48 @@ void parse(char *request, char *method, char *path){
   sscanf(request, "%s %s", method, path);
 }
 
-void response(int cfd, int status_code, char *status_text, char *content_type, char *body){
-  char response[4096];
-  int body_len = strlen(body);
-  int response_len = snprintf(
-  response, 
-  sizeof(response),
+void response(int cfd, int status_code, char *status_text, char *content_type, FILE *file){
+  char header_buffer[1024] = {0};
+  fseek(file, 0, SEEK_END);
+  int file_size = ftell(file);
+  rewind(file);
+
+  int header_len = snprintf(
+  header_buffer, 
+  sizeof(header_buffer),
     "HTTP/1.1 %d %s\r\n"
     "Content-Type: %s\r\n"
     "Content-Length: %d\r\n"
     "Connection: close\r\n"
-    "\r\n"
-    "%s",
+    "\r\n",
   status_code,
   status_text,
   content_type,
-  body_len,
-  body
+  file_size
 
                               );
+  write(cfd, response, header_len);
+  char file_buffer[4096] = {0};
+  int bytes_read;
+  while((bytes_read = fread(file_buffer, 1, sizeof(file_buffer), file)) > 0){
+    write(cfd, file_buffer, bytes_read);
+  }
+}
+
+void serve_error(int cfd, int status_code, char *status_txt, char *html_msg){
+  char response[1024];
+  int body_len = strlen(html_msg);
+  int response_len = snprintf(
+    response,
+    sizeof(response),
+    "HTTP/1.1 %d %s\r\n"
+    "Content-Type: text/html\r\n"
+    "Content-Lenght: %d\r\n"
+    "Connection: close\r\n"
+    "\r\n"
+    "%s",
+    status_code, status_txt, body_len, html_msg
+  );
   write(cfd, response, response_len);
 }
 
@@ -87,19 +110,30 @@ int main(void)
 
     //response 
     if(strcmp(method, "GET") == 0){
-      if(strcmp(path, "/") == 0){
-        response(cfd, 200, "OK", "text/html",
-                 "<html><body><h1>Hello from my C server!</h1></body></html>");
-      }else if(strcmp(path, "/about") == 0){
-        response(cfd, 200, "ok", "text/html",
-                 "<html><body><h1>About Page</h1><p>Built with raw C sockets.</p></body></html>");
-      }else {
-        response(cfd, 404, "Not Found", "text/html",
-                 "<html><body><h1>404 - Not Found</h1></body></html>");
+      char actual_path[512];
+
+ if(strcmp(path, "/")){
+        strcpy(actual_path, "index.html");
+      }else{
+        strcpy(actual_path, path + 1);
       }
-    }else {
-      response(cfd, 405, "Method Not Allowed", "text/plain",
-               "Method not allowed");
+      FILE *file = fopen(actual_path, "rb");
+      if(file == NULL){
+        printf("Page not found: %s\n", actual_path);
+        serve_error(cfd, 404, "Not Found", 
+                 "<html><body><h1>404 - Not Found</h1></body></html>");
+      }else{
+        char *content_type = "/text.plain";
+        if(strstr(actual_path, ".html")) content_type = "text/html";
+        else if(strstr(actual_path, ".css")) content_type = "text/css";
+        else if(strstr(actual_path, ".image/png")) content_type = "image/png";
+        response(cfd, 200, "OK", content_type, file);
+        printf("Log sucessfully served");
+      }
+
+    }else{
+      serve_error(cfd, 405, "Method Not Allowed",
+               "<html><body><h1> Method Not allowed</h1</body></html>");
     }
     close(cfd);
   }

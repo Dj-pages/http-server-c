@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-void process_request(char *request, char *method, char *path){
+void parse(char *request, char *method, char *path){
   sscanf(request, "%s %s", method, path);
 }
 
@@ -83,7 +83,7 @@ int main(void)
     read(cfd, buffer, sizeof(buffer));
     char method[16] = {0};
     char path[256] = {0};
-    process_request(buffer, method, path);
+    parse(buffer, method, path);
 
     //response 
     if(strcmp(method, "GET") == 0){

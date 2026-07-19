@@ -19,6 +19,7 @@ void* handle_client(void *arg)
   strncpy(buffer, req->buffer, sizeof(buffer));
 
   parse(buffer, method, path);
+  printf("Request: %s %s\n", method, path);
 
   //response 
   //If the method is GET
@@ -35,11 +36,14 @@ void* handle_client(void *arg)
       serve_error(cfd, internal_server_error, "Something went wrong",
               "<html><body><h1>500 - Something went wrong Please try again</h1></body></html>");
       close(cfd);
+      return NULL;
     }
     int fileD; //file discriptor for the requested file
     if((fileD = open(actual_path, O_RDONLY)) < 0){
       serve_error(cfd, internal_server_error, "Something went wrong",
               "<html><body><h1>500 - Something went wrong Please try again</h1></body></html>");
+      close(cfd);
+      return NULL;
     }
     //check the extension of the file
     char *content_type;

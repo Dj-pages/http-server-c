@@ -22,8 +22,13 @@ void response(int cfd, int status_code, char *status_text, char *content_type, i
 
   //Calculate the size of file
   struct stat st;
-  if(!(fstat(fileD, &st) == 0)){
-    printf("Faild to calculate the file length");
+  if((fstat(fileD, &st) < 0)){
+    perror("fstat failed");
+    // handle the error — e.g. send a 500 and return, don't fall through to garbage file_size
+    //serve_error(cfd, 500, "Internal Server Error", "<h1>500 Internal Server Error</h1>");
+    close(fileD);
+    close(cfd);
+    return;
   }
   int file_size = st.st_size;
 
